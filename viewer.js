@@ -298,7 +298,7 @@ function loadJSON(url) {
                 return;
             
             // Update local Einblicke links
-            if (query.get('source') == 'einblicke' && pageLink.href.startsWith(new URL(rootPath).origin)) {  
+            if (query.get('source') == 'einblicke' && pageLink.href.startsWith(window.location.origin)) {  
                 let queryPathFull = new URL(pageLink.getAttribute('href'), sourcePath).href,
                     queryPath = queryPathFull.substring((rootPath + 'einblicke/').length),
                     queryAnchor = '';
