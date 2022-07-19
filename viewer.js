@@ -70,7 +70,13 @@ function loadJSON(url) {
     
     pageRequest.send();
     pageRequest.onload = function() {
-        // Handle images
+        // Apply page title to parent
+        if (list[sourceID][targetID].title != undefined && list[sourceID][targetID].title != '')
+            document.title = list[sourceID][targetID].title + ' | Archive95';
+        else
+            document.title = list[sourceID][targetID].url + ' | Archive95';
+        
+        // Handle non-HTML files
         if (sourcePath.endsWith('.jpg') || sourcePath.endsWith('.gif')) {
             let imageEmbed = document.createElement('img');
             imageEmbed.src = window.URL.createObjectURL(this.response);
@@ -196,12 +202,6 @@ function loadJSON(url) {
         /*-----------------------+
          | Fix and update markup |
          +-----------------------*/
-        
-        // Apply page title to parent
-        if (list[sourceID][targetID].title != '')
-            document.title = list[sourceID][targetID].title;
-        else
-            document.title = list[sourceID][targetID].url;
         
         // Remove the only image-loading attribute I know of
         if (pageDocument.body.hasAttribute('background'))
