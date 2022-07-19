@@ -1,0 +1,46 @@
+body > div {
+    text-align: center;
+    margin: 0 auto;
+}
+img {
+    display: block;
+    margin: 0 auto 16px;
+}
+br {
+    all: unset;
+    display: block;
+    margin-bottom: 8px;
+}
+#search input {
+    width: 288px;
+    margin-right: 4px;
+}
+#info {
+    width: 640px;
+    margin-top: 16px;
+    text-align: left;
+}
+#results {
+    margin-top: 16px;
+}
+#results table {
+    width: 1152px;
+    border: 1px solid #000;
+    border-collapse: collapse;
+    margin: 16px auto;
+    table-layout: fixed;
+}
+#results table th,
+#results table td {
+    padding: 4px;
+    border: 1px solid #000;
+}
+#results table th:last-child {
+    width: 144px;
+}
+#results table td:nth-child(-n+2) {
+    text-align: left;
+}
+#results table td:nth-child(2) {
+    word-break: break-all;
+}
