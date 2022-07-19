@@ -229,7 +229,7 @@ function loadJSON(url) {
             pageDocument.querySelector('isindex').insertAdjacentElement('afterbegin', index);
         }
         
-        // Remove <img> elements that don't exist
+        // Update image locations, or replace with placeholder if they don't exist in the archive
         pageDocument.querySelectorAll('img').forEach(pageImage => {
             let imageIndex;
             
@@ -245,7 +245,7 @@ function loadJSON(url) {
             }
             
             if (imageIndex != -1) {
-                pageImage.src = 'einblicke/' + list[1][imageIndex].path;
+                pageImage.src = rootPath + 'einblicke/' + list[1][imageIndex].path;
             }
             else {
                 if (pageImage.alt)
