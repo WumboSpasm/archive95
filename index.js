@@ -89,12 +89,12 @@ async function performSearch() {
         
         if (results[i].availability <= 2) {
             linkLeft = document.createElement('a');
-            linkLeft.href = 'viewer.html?source=jamsa&url=' + results[i].url.replaceAll('#', '%23').replaceAll('&', '%26');
+            linkLeft.href = 'viewer/?source=jamsa&url=' + results[i].url.replaceAll('#', '%23').replaceAll('&', '%26');
             linkLeft.textContent = 'Jamsa';
         }
         if (results[i].availability >= 2) {
             linkRight = document.createElement('a');
-            linkRight.href = 'viewer.html?source=einblicke&url=' + results[i].url.replaceAll('#', '%23').replaceAll('?', '%3F').replaceAll('&', '%26');
+            linkRight.href = 'viewer/?source=einblicke&url=' + results[i].url.replaceAll('#', '%23').replaceAll('?', '%3F').replaceAll('&', '%26');
             linkRight.textContent = 'Einblicke';
         }
         

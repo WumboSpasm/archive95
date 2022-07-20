@@ -30,6 +30,9 @@ body {
 #right {
     text-align: right;
 }
+#right > span > a {
+    font-weight: bold;
+}
 
 /* Embedded page styling */
 #page > pre {

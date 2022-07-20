@@ -12,7 +12,7 @@ function loadJSON(url) {
 }
 
 (async function updatePage() {
-    let list = await Promise.all([loadJSON('data/jamsa.json'), loadJSON('data/einblicke.json')]);
+    let list = await Promise.all([loadJSON('../data/jamsa.json'), loadJSON('../data/einblicke.json')]);
     
     /*------------------+
      | Get query string |
@@ -23,7 +23,7 @@ function loadJSON(url) {
     
     // Redirect to homepage if URL doesn't exist in list
     if (targetID == -1)
-        window.location.replace('./');
+        window.location.replace('../');
     
     let rootPath    = 'https://archive.org/download/1995archive/1995archive.zip/';
         sourcePath  = query.get('source') == 'jamsa'
@@ -36,25 +36,28 @@ function loadJSON(url) {
     // URL text
     document.querySelector('#left b').textContent = list[sourceID][targetID].url;
     // Search domain
-    document.querySelector('#left a:nth-of-type(1)').href = './?query=' + new URL(list[sourceID][targetID].url).hostname;
+    document.querySelector('#left a:nth-of-type(1)').href = '../?query=' + new URL(list[sourceID][targetID].url).hostname;
     // View in Wayback Machine
     document.querySelector('#left a:nth-of-type(2)').href = 'https://web.archive.org/web/0/' + list[sourceID][targetID].url;
     // View original file
     document.querySelector('#left a:nth-of-type(3)').href = sourcePath;
     // Source
     if (query.get('source') == 'jamsa') {
-        document.querySelector('#right > span b').textContent = 'World Wide Web Directory';
-        document.querySelector('#right > span span').textContent = 'Jamsa Press, June 1995';
+        document.querySelector('#right > span > a').textContent = 'World Wide Web Directory';
+        document.querySelector('#right > span > a').href = 'https://archive.org/details/www-dir-cd';
+        document.querySelector('#right > span > span').textContent = 'June 1995';
     }
     else {
-        document.querySelector('#right > span b').textContent = 'Einblicke ins Internet';
-        document.querySelector('#right > span span').textContent = 'Carl Hanser Verlag, October 1995';
+        document.querySelector('#right > span > a').textContent = 'Einblicke ins Internet';
+        document.querySelector('#right > span > a').href = 'https://cs.rit.edu/~ats/books/cd';
+        document.querySelector('#right > span > span').textContent = 'October 1995';
     }
-    // Switch
+    // See earlier/newer version
     if (list[(sourceID + 1) % 2].findIndex(file => file.url == query.get('url')) != -1) {
         let altSource = query.get('source') == 'jamsa' ? 'einblicke' : 'jamsa';
-        document.querySelector('#right a').href = 'viewer.html?source=' + altSource + '&url=' + query.get('url');
-        document.querySelector('#right a').style.display = 'initial';
+        document.querySelector('#right > a').textContent = 'See ' + (query.get('source') == 'jamsa' ? 'newer' : 'older') + ' version';
+        document.querySelector('#right > a').href = './?source=' + altSource + '&url=' + query.get('url');
+        document.querySelector('#right > a').style.display = 'initial';
     }
     
     /*-------------------------------+
@@ -309,7 +312,7 @@ function loadJSON(url) {
                 }
                 
                 let actualURL = list[1].find(file => file.path == queryPath).url;
-                pageLink.href = location.pathname + '?source=einblicke&url=' + (actualURL + queryAnchor);
+                pageLink.href = './?source=einblicke&url=' + (actualURL + queryAnchor);
                 
                 return;
             }
@@ -319,7 +322,7 @@ function loadJSON(url) {
                 let j = (i + sourceID) % 2;
                 
                 if (list[j].findIndex(obj => obj.url === fullURL) != -1) {
-                    pageLink.href = location.pathname + '?source=' + (j == 0 ? 'jamsa' : 'einblicke') + '&url=' + fullURL;
+                    pageLink.href = './?source=' + (j == 0 ? 'jamsa' : 'einblicke') + '&url=' + fullURL;
                     return;
                 }
             }
