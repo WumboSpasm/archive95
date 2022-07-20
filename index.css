@@ -6,14 +6,14 @@ img {
     display: block;
     margin: 0 auto 16px;
 }
-br {
-    all: unset;
-    display: block;
-    margin-bottom: 8px;
-}
 #search input {
     width: 288px;
     margin-right: 4px;
+}
+#search a:before {
+    display: block;
+    content: '\A';
+    margin-top: 8px;
 }
 #info {
     width: 640px;
