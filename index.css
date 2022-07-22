@@ -10,10 +10,12 @@ img {
     width: 288px;
     margin-right: 4px;
 }
-#search a:before {
-    display: block;
-    content: '\A';
+#search div {
     margin-top: 8px;
+}
+#search div a {
+    display: inline-block;
+    margin: 0 6px;
 }
 #info {
     width: 640px;

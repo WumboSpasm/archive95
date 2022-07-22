@@ -11,19 +11,63 @@ function loadJSON(url) {
     });
 }
 
+/*------------------------+
+ | Correctly compare URLs |
+ +------------------------*/
+function compareURLs(...urls) {
+    if (urls.length > 2)
+        urls = urls.slice(0, 2);
+    
+    urls = urls
+        .map(url => decodeURIComponent(url))
+        .map(url => url.toLowerCase())
+        .map(url => url.includes('index.htm') ? url.substring(0, url.indexOf('index.htm')) : url)
+        .map(url => url.startsWith('http://www.') ? 'http://' + url.substring('http://www.'.length) : url)
+        .map(url => url.endsWith('/') ? url.substring(0, url.length - 1) : url);
+    
+    return urls[0] == urls[1];
+}
+
+
 (async function updatePage() {
     let list = await Promise.all([loadJSON('../data/jamsa.json'), loadJSON('../data/einblicke.json')]);
     
     /*------------------+
      | Get query string |
      +------------------*/
-    let query = new URLSearchParams(location.search),
+    let query = new URLSearchParams(location.search);
+    
+    if (!query.has('url')) {
+        alert('No URL was specified!');
+        return;
+    }
+    
+    let sourceID, targetID;
+    
+    if (query.has('source')) {
         sourceID = query.get('source') == 'jamsa' ? 0 : 1;
-        targetID = targetID = list[sourceID].findIndex(file => decodeURIComponent(file.url) == decodeURIComponent(query.get('url')));
+        targetID = targetID = list[sourceID].findIndex(file => compareURLs(file.url, query.get('url')));
+    }
+    else {
+        list.some((source, id) => {
+            let fileIndex = source.findIndex(file => compareURLs(file.url, query.get('url')));
+            
+            if (fileIndex != -1) {
+                sourceID = id;
+                targetID = fileIndex;
+                query.append('source', id == 0 ? 'jamsa' : 'einblicke');
+                
+                return true;
+            }
+        });
+    }
     
     // Redirect to homepage if URL doesn't exist in list
-    if (targetID == -1)
+    if (targetID == -1) {
+        alert('The URL ' + query.get('url') + ' does not exist in the archive!');
         window.location.replace('../');
+        return;
+    }
     
     let rootPath    = 'https://archive.org/download/1995archive/1995archive.zip/';
         sourcePath  = query.get('source') == 'jamsa'
@@ -34,30 +78,30 @@ function loadJSON(url) {
      | Fill in data at bottom of screen |
      +----------------------------------*/
     // URL text
-    document.querySelector('#left b').textContent = list[sourceID][targetID].url;
+    document.querySelector('#url').textContent = decodeURIComponent(list[sourceID][targetID].url);
     // Search domain
-    document.querySelector('#left a:nth-of-type(1)').href = '../?query=' + new URL(list[sourceID][targetID].url).hostname;
+    document.querySelector('#links a:nth-of-type(1)').href = '../?query=' + new URL(list[sourceID][targetID].url).hostname;
     // View in Wayback Machine
-    document.querySelector('#left a:nth-of-type(2)').href = 'https://web.archive.org/web/0/' + list[sourceID][targetID].url;
+    document.querySelector('#links a:nth-of-type(2)').href = 'https://web.archive.org/web/0/' + list[sourceID][targetID].url;
     // View original file
-    document.querySelector('#left a:nth-of-type(3)').href = sourcePath;
+    document.querySelector('#links a:nth-of-type(3)').href = sourcePath;
     // Source
     if (query.get('source') == 'jamsa') {
-        document.querySelector('#right > span > a').textContent = 'World Wide Web Directory';
-        document.querySelector('#right > span > a').href = 'https://archive.org/details/www-dir-cd';
-        document.querySelector('#right > span > span').textContent = 'June 1995';
+        document.querySelector('#source a').textContent = 'World Wide Web Directory';
+        document.querySelector('#source a').href = 'https://archive.org/details/www-dir-cd';
+        document.querySelector('#source span').textContent = 'June 1995';
     }
     else {
-        document.querySelector('#right > span > a').textContent = 'Einblicke ins Internet';
-        document.querySelector('#right > span > a').href = 'https://cs.rit.edu/~ats/books/cd';
-        document.querySelector('#right > span > span').textContent = 'October 1995';
+        document.querySelector('#source a').textContent = 'Einblicke ins Internet';
+        document.querySelector('#source a').href = 'https://cs.rit.edu/~ats/books/cd';
+        document.querySelector('#source span').textContent = 'October 1995';
     }
     // See earlier/newer version
-    if (list[(sourceID + 1) % 2].findIndex(file => file.url == query.get('url')) != -1) {
+    if (list[(sourceID + 1) % 2].findIndex(file => compareURLs(file.url, query.get('url'))) != -1) {
         let altSource = query.get('source') == 'jamsa' ? 'einblicke' : 'jamsa';
-        document.querySelector('#right > a').textContent = 'See ' + (query.get('source') == 'jamsa' ? 'newer' : 'older') + ' version';
-        document.querySelector('#right > a').href = './?source=' + altSource + '&url=' + query.get('url');
-        document.querySelector('#right > a').style.display = 'initial';
+        document.querySelector('#switch a').textContent = 'See ' + (query.get('source') == 'jamsa' ? 'newer' : 'older') + ' version';
+        document.querySelector('#switch a').href = './?source=' + altSource + '&url=' + query.get('url');
+        document.querySelector('#switch').hidden = false;
     }
     
     /*-------------------------------+
@@ -66,18 +110,18 @@ function loadJSON(url) {
     let pageRequest = new XMLHttpRequest();
     pageRequest.open('GET', sourcePath);
     
-    if (sourcePath.endsWith('.htm')) 
-        pageRequest.overrideMimeType('text/plain; charset=ascii');
-    else
+    if (!sourcePath.endsWith('.htm'))
         pageRequest.responseType = 'blob';
     
     pageRequest.send();
-    pageRequest.onload = function() {
+    pageRequest.onload = async function() {
         // Apply page title to parent
-        if (list[sourceID][targetID].title != undefined && list[sourceID][targetID].title != '')
-            document.title = list[sourceID][targetID].title + ' | Archive95';
+        if (list[sourceID][targetID].title != undefined && list[sourceID][targetID].title != '') {
+            let parsedTitle = new DOMParser().parseFromString(list[sourceID][targetID].title, 'text/html').body.textContent;
+            document.title = parsedTitle + ' | Archive95';
+        }
         else
-            document.title = list[sourceID][targetID].url + ' | Archive95';
+            document.title = decodeURIComponent(list[sourceID][targetID].url) + ' | Archive95';
         
         // Handle non-HTML files
         if (sourcePath.endsWith('.jpg') || sourcePath.endsWith('.gif')) {
@@ -113,7 +157,7 @@ function loadJSON(url) {
                 greaterThan = pageMarkup.indexOf('>', lessThan);
             
             // Check for and fix comments without ending double hyphen
-            if (lessThan == commentStart && commentStart != -1 && commentEnd != greaterThan - 2)
+            if (lessThan == commentStart && commentStart != -1 && pageMarkup.indexOf('<', lessThan + 1) != lessThan + 4 && commentEnd != greaterThan - 2)
                 pageMarkup = pageMarkup.substring(0, greaterThan) + '--' + pageMarkup.substring(greaterThan, pageMarkup.length);
             // Check for and fix HTML attributes without ending quotation mark
             else {
@@ -168,11 +212,11 @@ function loadJSON(url) {
         
         if (query.get('source') == 'einblicke') {
             // Remove placeholder images
-            pageDocument.querySelectorAll('img:is([src$="teufel.gif"], [src$="link.gif"])').forEach(pageImage => {
+            pageDocument.querySelectorAll('img:is([src$="teufel.gif"], [src$="link.gif"], [src$="grey.gif"])').forEach(pageImage => {
                 if (pageImage.src.endsWith('link.gif') && pageImage.parentNode.nodeName == 'A')
-                    pageImage.parentNode.replaceWith(pageImage.alt.length > 0 ? pageImage.alt : '[image]');
+                    pageImage.parentNode.replaceWith(pageImage.hasAttribute('alt') ? pageImage.alt : '[image]');
                 else
-                    pageImage.replaceWith(pageImage.alt.length > 0 ? pageImage.alt : '[image]');
+                    pageImage.replaceWith(pageImage.hasAttribute('alt') ? pageImage.alt : '[image]');
             });
             
             // Revert changes to links
@@ -205,14 +249,30 @@ function loadJSON(url) {
         /*-----------------------+
          | Fix and update markup |
          +-----------------------*/
-        
-        // Remove the only image-loading attribute I know of
-        if (pageDocument.body.hasAttribute('background'))
-            pageDocument.body.removeAttribute('background');
-        
-        // Replicate functionality of a rare non-standard attribute meant to change the background color
-        if (pageDocument.body.hasAttribute('rgb'))
-            pageDocument.body.style.backgroundColor = pageDocument.body.getAttribute('rgb');
+        // Copy important attributes from body to root
+        let backgroundMap = ['bgcolor', 'rgb'],
+            textMap = [
+            ['text',  '*'],
+            ['link',  'a:link, a:link *'],
+            ['alink', 'a:active, a:active *'],
+            ['vlink', 'a:visited, a:visited *']
+        ];
+        backgroundMap.forEach(attribute => {
+            if (pageDocument.body.hasAttribute(attribute))
+                document.querySelector('#page').style.backgroundColor = 
+                    pageDocument.body.getAttribute(attribute)[0] != '#'
+                    ? '#' + pageDocument.body.getAttribute(attribute)
+                    : pageDocument.body.getAttribute(attribute);
+        });
+        textMap.forEach(array => {
+            if (pageDocument.body.hasAttribute(array[0]))
+                pageDocument.querySelectorAll(array[1]).forEach(elem => {
+                    elem.style.color = 
+                        pageDocument.body.getAttribute(array[0])[0] != '#'
+                        ? '#' + pageDocument.body.getAttribute(array[0])
+                        : pageDocument.body.getAttribute(array[0]);
+                });
+        });
         
         // Insert placeholder for <isindex>
         if (pageDocument.querySelector('isindex')) {
@@ -238,7 +298,7 @@ function loadJSON(url) {
             
             if (query.get('source') == 'jamsa') {
                 let queryURL = new URL(pageImage.getAttribute('src'), list[sourceID][targetID].url).href;
-                imageIndex = list[1].findIndex(img => img.url == queryURL);
+                imageIndex = list[1].findIndex(img => compareURLs(img.url, queryURL));
             }
             else {
                 let queryPathFull = new URL(pageImage.getAttribute('src'), sourcePath).href,
@@ -251,7 +311,7 @@ function loadJSON(url) {
                 pageImage.src = rootPath + 'einblicke/' + list[1][imageIndex].path;
             }
             else {
-                if (pageImage.alt)
+                if (pageImage.hasAttribute('alt'))
                     pageImage.insertAdjacentText('afterend', pageImage.alt);
                 else if (pageImage.src && pageImage.src.length > 1)
                     pageImage.insertAdjacentText('afterend', ' ' + pageImage.src.substring(pageImage.src.lastIndexOf("/") + 1) + ' ');
@@ -283,8 +343,11 @@ function loadJSON(url) {
         document.querySelector('#page > div').innerHTML = pageDocument.documentElement.innerHTML;
         
         // Redirect links to archival sites
-        document.querySelectorAll('#page > div a[href]').forEach((pageLink) => {
-            let fullURL;
+        for (let l = 0; l < document.querySelectorAll('#page > div a[href]').length; l++) {
+            await new Promise(resolve => setTimeout(resolve));
+            
+            let pageLink = document.querySelectorAll('#page > div a[href]')[l],
+                fullURL;
             
             try {
                 fullURL = new URL(pageLink.getAttribute('href'), list[sourceID][targetID].url).href;
@@ -293,12 +356,12 @@ function loadJSON(url) {
             catch {
                 pageLink.setAttribute('target', '_blank');
                 pageLink.href = 'https://web.archive.org/web/0/' + pageLink.href;
-                return;
+                continue;
             }
             
             // Ignore anchors and non-HTTP links
             if (!fullURL.startsWith('http://') || pageLink.getAttribute('href').startsWith('#'))
-                return;
+                continue;
             
             // Update local Einblicke links
             if (query.get('source') == 'einblicke' && pageLink.href.startsWith(window.location.origin)) {  
@@ -314,22 +377,22 @@ function loadJSON(url) {
                 let actualURL = list[1].find(file => file.path == queryPath).url;
                 pageLink.href = './?source=einblicke&url=' + (actualURL + queryAnchor);
                 
-                return;
+                continue;
             }
             
             // Look for link in databases and update if found
             for (let i = 0; i < list.length; i++) {
-                let j = (i + sourceID) % 2;
+                let j = (i + sourceID) % 2,
+                    pageIndex = list[j].findIndex(file => compareURLs(file.url, fullURL));
                 
-                if (list[j].findIndex(obj => obj.url === fullURL) != -1) {
-                    pageLink.href = './?source=' + (j == 0 ? 'jamsa' : 'einblicke') + '&url=' + fullURL;
-                    return;
+                if (pageIndex != -1)
+                    pageLink.href = './?source=' + (j == 0 ? 'jamsa' : 'einblicke') + '&url=' + list[j][pageIndex].url;
+                else if (i == list.length - 1) {
+                    // Redirect to Wayback Machine if link doesn't exist locally
+                    pageLink.setAttribute('target', '_blank');
+                    pageLink.href = 'https://web.archive.org/web/0/' + fullURL;
                 }
             }
-            
-            // Redirect to Wayback Machine if link doesn't exist locally
-            pageLink.setAttribute('target', '_blank');
-            pageLink.href = 'https://web.archive.org/web/0/' + fullURL;
-        });
+        };
     };
 })()
