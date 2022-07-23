@@ -1,6 +1,7 @@
-/*--------------------+
- | Retrieve JSON data |
- +--------------------*/
+/*-------------------+
+ | Helpful functions |
+ +-------------------*/
+// Retrieve JSON data
 function loadJSON(url) {
     return new Promise((resolve, reject) => {
         let request = new XMLHttpRequest();
@@ -11,9 +12,7 @@ function loadJSON(url) {
     });
 }
 
-/*------------------------+
- | Correctly compare URLs |
- +------------------------*/
+// Correctly compare URLs
 function compareURLs(...urls) {
     if (urls.length > 2)
         urls = urls.slice(0, 2);
@@ -28,7 +27,6 @@ function compareURLs(...urls) {
     return urls[0] == urls[1];
 }
 
-
 (async function updatePage() {
     let list = await Promise.all([loadJSON('../data/jamsa.json'), loadJSON('../data/einblicke.json')]);
     
@@ -39,17 +37,20 @@ function compareURLs(...urls) {
     
     if (!query.has('url')) {
         alert('No URL was specified!');
+        window.location.replace('../');
         return;
     }
     
     let sourceID, targetID;
     
+    // If source is specified, expect URL to reside inside it
     if (query.has('source')) {
         sourceID = query.get('source') == 'jamsa' ? 0 : 1;
         targetID = targetID = list[sourceID].findIndex(file => compareURLs(file.url, query.get('url')));
     }
+    // Otherwise, search the entire database for the URL
     else {
-        list.some((source, id) => {
+        let urlExists = list.some((source, id) => {
             let fileIndex = source.findIndex(file => compareURLs(file.url, query.get('url')));
             
             if (fileIndex != -1) {
@@ -60,6 +61,9 @@ function compareURLs(...urls) {
                 return true;
             }
         });
+        
+        if (!urlExists)
+            targetID = -1;
     }
     
     // Redirect to homepage if URL doesn't exist in list
@@ -69,7 +73,7 @@ function compareURLs(...urls) {
         return;
     }
     
-    let rootPath    = 'https://archive.org/download/1995archive/1995archive.zip/';
+    let rootPath    = 'https://archive.org/download/1995archive/1995archive.zip/',
         sourcePath  = query.get('source') == 'jamsa'
                     ? (rootPath + 'jamsa/' + targetID + '.htm')
                     : (rootPath + 'einblicke/' + list[sourceID][targetID].path);
@@ -80,7 +84,10 @@ function compareURLs(...urls) {
     // URL text
     document.querySelector('#url').textContent = decodeURIComponent(list[sourceID][targetID].url);
     // Search domain
-    document.querySelector('#links a:nth-of-type(1)').href = '../?query=' + new URL(list[sourceID][targetID].url).hostname;
+    {
+        let host = new URL(list[sourceID][targetID].url).hostname;
+        document.querySelector('#links a:nth-of-type(1)').href = '../?query=' + (host.startsWith('www.') ? host.substring('www.'.length) : host);
+    }
     // View in Wayback Machine
     document.querySelector('#links a:nth-of-type(2)').href = 'https://web.archive.org/web/0/' + list[sourceID][targetID].url;
     // View original file
@@ -149,45 +156,59 @@ function compareURLs(...urls) {
         }
         
         // Fix bad markup that can hide large portions of a page in modern browsers
-        let lessThan = pageMarkup.indexOf('<');
-        
-        while (lessThan != -1) {
-            let commentStart = pageMarkup.indexOf('<!--', lessThan),
-                commentEnd = pageMarkup.indexOf('-->', commentStart),
-                greaterThan = pageMarkup.indexOf('>', lessThan);
+        {
+            let lessThan = pageMarkup.indexOf('<');
             
-            // Check for and fix comments without ending double hyphen
-            if (lessThan == commentStart && commentStart != -1 && pageMarkup.indexOf('<', lessThan + 1) != lessThan + 4 && commentEnd != greaterThan - 2)
-                pageMarkup = pageMarkup.substring(0, greaterThan) + '--' + pageMarkup.substring(greaterThan, pageMarkup.length);
-            // Check for and fix HTML attributes without ending quotation mark
-            else {
-                let innerElement = pageMarkup.substring(lessThan + 1, greaterThan),
-                    attributeStart = innerElement.lastIndexOf('="');
+            while (lessThan != -1) {
+                let commentStart = pageMarkup.indexOf('<!--', lessThan),
+                    commentEnd = pageMarkup.indexOf('-->', commentStart),
+                    greaterThan = pageMarkup.indexOf('>', lessThan);
                 
-                if (attributeStart != -1 && innerElement.indexOf('"', attributeStart + 2) == -1)
-                    pageMarkup = pageMarkup.substring(0, greaterThan) + '"' + pageMarkup.substring(greaterThan, pageMarkup.length);
+                // Check for and fix comments without ending double hyphen
+                if (lessThan == commentStart && commentStart != -1 && pageMarkup.indexOf('<', lessThan + 1) != lessThan + 4 && commentEnd != greaterThan - 2)
+                    pageMarkup = pageMarkup.substring(0, greaterThan) + '--' + pageMarkup.substring(greaterThan, pageMarkup.length);
+                // Check for and fix HTML attributes without ending quotation mark
+                else {
+                    let innerElement = pageMarkup.substring(lessThan + 1, greaterThan),
+                        attributeStart = innerElement.lastIndexOf('="');
+                    
+                    if (attributeStart != -1 && innerElement.indexOf('"', attributeStart + 2) == -1)
+                        pageMarkup = pageMarkup.substring(0, greaterThan) + '"' + pageMarkup.substring(greaterThan, pageMarkup.length);
+                }
+                
+                lessThan = pageMarkup.indexOf('<', lessThan + 1);
             }
-            
-            lessThan = pageMarkup.indexOf('<', lessThan + 1);
         }
         
-        /*
         // Add missing closing tags to list elements
-        // To-do: Make this not screw up multi-line titles/descriptions
-        // (see: http://www.apple.com/ and http://atlasinfo.cern.ch/Atlas/ORGANISATION/general.html)
-        pageMarkup = pageMarkup.replaceAll(
-            /<dt>(?!.*<\/dt>)(.*$)\n/gim,
-            '<dt>$1</dt>'
-        ).replaceAll(
-            /<dd>(?!.*<\/dd>)(.*$)\n/gim,
-            '<dd>$1</dd>'
-        );
-        */
+        {
+            let listElement = 0;
+                listOffset  = 0;
+            
+            while (listElement != -1) {
+                await new Promise(resolve => setTimeout(resolve));
+                
+                listElement = pageMarkup.substring(listOffset).search(/(<dt.*?>|<dd.*?>)/is);
+                listOffset += listElement + 1;
+                
+                let closingPoint = pageMarkup.substring(listOffset).search(/(<dl.*?>|<dt.*?>|<dd.*?>|<\/dl>)/is),
+                    closingTag   = pageMarkup.substring(listOffset).search(/(<\/dt>|<\/dd>)/is);
+                
+                if (listElement != -1 && closingPoint != -1 && (closingTag == -1 || closingTag > closingPoint)) {
+                    let closingIndex  = listOffset + closingPoint;
+                    
+                    pageMarkup = pageMarkup.substring(0, closingIndex)
+                               + '</' + pageMarkup.substring(listOffset - 1).match(/<.*?>/is)[0].substring(1, 3) + '>'
+                               + pageMarkup.substring(closingIndex, pageMarkup.length);
+                    
+                    listElement += '</dd>'.length - 1;
+                }
+            }
+        }
         
         /*----------------------------------------------+
          | Revert markup changes if source is Einblicke |
          +----------------------------------------------*/
-        
         if (query.get('source') == 'einblicke') {
             pageMarkup = pageMarkup.replaceAll(
                 // Remove footer
@@ -250,29 +271,31 @@ function compareURLs(...urls) {
          | Fix and update markup |
          +-----------------------*/
         // Copy important attributes from body to root
-        let backgroundMap = ['bgcolor', 'rgb'],
-            textMap = [
-            ['text',  '*'],
-            ['link',  'a:link, a:link *'],
-            ['alink', 'a:active, a:active *'],
-            ['vlink', 'a:visited, a:visited *']
-        ];
-        backgroundMap.forEach(attribute => {
-            if (pageDocument.body.hasAttribute(attribute))
-                document.querySelector('#page').style.backgroundColor = 
-                    pageDocument.body.getAttribute(attribute)[0] != '#'
-                    ? '#' + pageDocument.body.getAttribute(attribute)
-                    : pageDocument.body.getAttribute(attribute);
-        });
-        textMap.forEach(array => {
-            if (pageDocument.body.hasAttribute(array[0]))
-                pageDocument.querySelectorAll(array[1]).forEach(elem => {
-                    elem.style.color = 
-                        pageDocument.body.getAttribute(array[0])[0] != '#'
-                        ? '#' + pageDocument.body.getAttribute(array[0])
-                        : pageDocument.body.getAttribute(array[0]);
-                });
-        });
+        {
+            let backgroundMap = ['bgcolor', 'rgb'],
+                textMap = [
+                ['text',  '*'],
+                ['link',  'a:link, a:link *'],
+                ['alink', 'a:active, a:active *'],
+                ['vlink', 'a:visited, a:visited *']
+            ];
+            backgroundMap.forEach(attribute => {
+                if (pageDocument.body.hasAttribute(attribute))
+                    document.querySelector('#page').style.backgroundColor = 
+                        pageDocument.body.getAttribute(attribute)[0] != '#'
+                        ? '#' + pageDocument.body.getAttribute(attribute)
+                        : pageDocument.body.getAttribute(attribute);
+            });
+            textMap.forEach(array => {
+                if (pageDocument.body.hasAttribute(array[0]))
+                    pageDocument.querySelectorAll(array[1]).forEach(elem => {
+                        elem.style.color = 
+                            pageDocument.body.getAttribute(array[0])[0] != '#'
+                            ? '#' + pageDocument.body.getAttribute(array[0])
+                            : pageDocument.body.getAttribute(array[0]);
+                    });
+            });
+        }
         
         // Insert placeholder for <isindex>
         if (pageDocument.querySelector('isindex')) {
