@@ -186,8 +186,6 @@ function compareURLs(...urls) {
                 listOffset  = 0;
             
             while (listElement != -1) {
-                await new Promise(resolve => setTimeout(resolve));
-                
                 listElement = pageMarkup.substring(listOffset).search(/(<dt.*?>|<dd.*?>)/is);
                 listOffset += listElement + 1;
                 
@@ -352,15 +350,17 @@ function compareURLs(...urls) {
         });
         
         // Remove unneeded HTML tags/elements
-        let unneededElements = [ 'head', 'header', 'link', 'meta', 'form' ],
-            unneededTags = [ 'title', 'base', 'nextid' ];
-        
-        pageDocument.querySelectorAll('*').forEach(node => {
-            if (unneededElements.includes(node.nodeName.toLowerCase()))
-                node.replaceWith(...node.childNodes);
-            else if (unneededTags.includes(node.nodeName.toLowerCase()))
-                node.remove();
-        });
+        {
+            let unneededElements = [ 'head', 'header', 'link', 'meta', 'form' ],
+                unneededTags = [ 'title', 'base', 'nextid' ];
+            
+            pageDocument.querySelectorAll('*').forEach(node => {
+                if (unneededElements.includes(node.nodeName.toLowerCase()))
+                    node.replaceWith(...node.childNodes);
+                else if (unneededTags.includes(node.nodeName.toLowerCase()))
+                    node.remove();
+            });
+        }
         
         // Apply modified HTML to div
         document.querySelector('#page > div').innerHTML = pageDocument.documentElement.innerHTML;
