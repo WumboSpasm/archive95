@@ -3,7 +3,7 @@
  +-------------------*/
 // Retrieve JSON data
 function loadJSON(url) {
-    return new Promise((resolve, reject) => {
+    return new Promise(resolve => {
         let request = new XMLHttpRequest();
         request.open('GET', url);
         request.responseType = 'json';
@@ -17,16 +17,83 @@ function compareURLs(...urls) {
     if (urls.length > 2)
         urls = urls.slice(0, 2);
     
+    try { urls = urls.map(url => decodeURIComponent(url)) } catch { }
+    
     urls = urls
-        .map(url => decodeURIComponent(url))
         .map(url => url.toLowerCase())
-        .map(url => url.includes('index.htm') ? url.substring(0, url.indexOf('index.htm')) : url)
+        // .map(url => url.includes('/index.htm') ? url.substring(0, url.indexOf('/index.htm')) : url)
         .map(url => url.startsWith('http://www.') ? 'http://' + url.substring('http://www.'.length) : url)
         .map(url => url.endsWith('/') ? url.substring(0, url.length - 1) : url);
     
     return urls[0] == urls[1];
 }
 
+// Prevent image from loading, add alt text if necessary
+function sanitizeImage(pageImage, useFilename = true) {
+    if (!pageImage.hasAttribute('alt')) {
+        if (useFilename && pageImage.hasAttribute('src') && pageImage.src.length > 1)
+            pageImage.alt = pageImage.src.substring(pageImage.src.lastIndexOf("/") + 1, pageImage.src.lastIndexOf('.'));
+        else
+            pageImage.alt = '[image]'
+    }
+    
+    pageImage.removeAttribute('src');
+}
+
+// Parse XBM files
+async function parseXBM(url) {
+    let xbmData = await new Promise(resolve => {
+        let xbmRequest = new XMLHttpRequest();
+        xbmRequest.open('GET', url);
+        xbmRequest.responseType = 'text';
+        xbmRequest.send();
+        xbmRequest.onload = function() { resolve(this.response) };
+    });
+    
+    let xbmWidth  = parseInt(xbmData.replace(/.*_width ([0-9]*).*/is, '$1')),
+        xbmHeight = parseInt(xbmData.replace(/.*_height ([0-9]*).*/is, '$1')),
+        
+        xbmArray  = new Function('return [' + xbmData.replace(/.*\{(.*?)\}.*/is, '$1') + ']')(),
+        
+        canvas = document.createElement('canvas'),
+        ctx = canvas.getContext('2d', { alpha: false }),
+        
+        xbmDrawing = ctx.createImageData(xbmWidth, xbmHeight),
+        xbmOffset  = 0;
+    
+    if (xbmArray.length > xbmWidth * xbmHeight)
+        xbmArray = xbmArray.slice(0, xbmWidth * xbmHeight);
+    
+    for (let byte of xbmArray) {
+        let bits = (byte >> 0)
+            .toString(2)
+            .padStart(8, '0')
+            .split('')
+            .map(b => parseInt(b))
+            .reverse();
+        
+        for (let b = 0; b < bits.length; b++) {
+            if (xbmWidth % 8 != 0 && (xbmOffset / 4) % xbmWidth == 0 && b == xbmWidth % 8)
+                break;
+            
+            for (let c = 0; c < 3; c++)
+                xbmDrawing.data[xbmOffset + c] = ((bits[b] + 1) % 2) * 255;
+            
+            xbmDrawing.data[xbmOffset + 3] = 255;
+            
+            xbmOffset += 4;
+        }
+    }
+    
+    canvas.width  = xbmWidth;
+    canvas.height = xbmHeight;
+    
+    ctx.putImageData(xbmDrawing, 0, 0);
+    
+    return canvas.toDataURL();
+}
+
+// Handle everything
 (async function updatePage() {
     let list = await Promise.all([loadJSON('../data/jamsa.json'), loadJSON('../data/einblicke.json')]);
     
@@ -108,7 +175,14 @@ function compareURLs(...urls) {
         let altSource = query.get('source') == 'jamsa' ? 'einblicke' : 'jamsa';
         document.querySelector('#switch a').textContent = 'See ' + (query.get('source') == 'jamsa' ? 'newer' : 'older') + ' version';
         document.querySelector('#switch a').href = './?source=' + altSource + '&url=' + query.get('url');
-        document.querySelector('#switch').hidden = false;
+        document.querySelector('#switch').style.display = 'initial';
+    }
+    // Jamsa screenshot
+    if (query.get('source') == 'jamsa') {
+        let imageURL = rootPath + 'jamsa/images/' + targetID + '.png';
+        document.querySelector('#picture img').src = imageURL;
+        document.querySelector('#picture a').href  = imageURL;
+        document.querySelector('#picture').hidden  = false;
     }
     
     /*-------------------------------+
@@ -131,9 +205,14 @@ function compareURLs(...urls) {
             document.title = decodeURIComponent(list[sourceID][targetID].url) + ' | Archive95';
         
         // Handle non-HTML files
-        if (sourcePath.endsWith('.jpg') || sourcePath.endsWith('.gif')) {
+        if (sourcePath.endsWith('.jpg') || sourcePath.endsWith('.gif') || sourcePath.endsWith('.xbm')) {
             let imageEmbed = document.createElement('img');
-            imageEmbed.src = window.URL.createObjectURL(this.response);
+            
+            if (sourcePath.endsWith('.xbm'))
+                imageEmbed.src = await parseXBM(sourcePath);
+            else
+                imageEmbed.src = window.URL.createObjectURL(this.response);
+            
             document.querySelector('#page > div').append(imageEmbed);
             return;
         }
@@ -160,17 +239,15 @@ function compareURLs(...urls) {
             let lessThan = pageMarkup.indexOf('<');
             
             while (lessThan != -1) {
-                let commentStart = pageMarkup.indexOf('<!--', lessThan),
-                    commentEnd = pageMarkup.indexOf('-->', commentStart),
-                    greaterThan = pageMarkup.indexOf('>', lessThan);
+                let greaterThan = pageMarkup.indexOf('>', lessThan),
+                    innerElement = pageMarkup.substring(lessThan + 1, greaterThan);
                 
                 // Check for and fix comments without ending double hyphen
-                if (lessThan == commentStart && commentStart != -1 && pageMarkup.indexOf('<', lessThan + 1) != lessThan + 4 && commentEnd != greaterThan - 2)
+                if (innerElement.startsWith('!--') && !innerElement.endsWith('--') && !innerElement.includes('<'))
                     pageMarkup = pageMarkup.substring(0, greaterThan) + '--' + pageMarkup.substring(greaterThan, pageMarkup.length);
                 // Check for and fix HTML attributes without ending quotation mark
                 else {
-                    let innerElement = pageMarkup.substring(lessThan + 1, greaterThan),
-                        attributeStart = innerElement.lastIndexOf('="');
+                    let attributeStart = innerElement.lastIndexOf('="');
                     
                     if (attributeStart != -1 && innerElement.indexOf('"', attributeStart + 2) == -1)
                         pageMarkup = pageMarkup.substring(0, greaterThan) + '"' + pageMarkup.substring(greaterThan, pageMarkup.length);
@@ -233,9 +310,9 @@ function compareURLs(...urls) {
             // Remove placeholder images
             pageDocument.querySelectorAll('img:is([src$="teufel.gif"], [src$="link.gif"], [src$="grey.gif"])').forEach(pageImage => {
                 if (pageImage.src.endsWith('link.gif') && pageImage.parentNode.nodeName == 'A')
-                    pageImage.parentNode.replaceWith(pageImage.hasAttribute('alt') ? pageImage.alt : '[image]');
-                else
-                    pageImage.replaceWith(pageImage.hasAttribute('alt') ? pageImage.alt : '[image]');
+                    pageImage.parentNode.replaceWith(...pageImage.parentNode.childNodes);
+                
+                sanitizeImage(pageImage, false);
             });
             
             // Revert changes to links
@@ -314,32 +391,33 @@ function compareURLs(...urls) {
         }
         
         // Update image locations, or replace with placeholder if they don't exist in the archive
-        pageDocument.querySelectorAll('img').forEach(pageImage => {
+        for (let pageImage of pageDocument.querySelectorAll('img')) {
+            if (!pageImage.hasAttribute('src'))
+                continue;
+            
             let imageIndex;
             
             if (query.get('source') == 'jamsa') {
                 let queryURL = new URL(pageImage.getAttribute('src'), list[sourceID][targetID].url).href;
                 imageIndex = list[1].findIndex(img => compareURLs(img.url, queryURL));
             }
-            else {
+            else if (!pageImage.getAttribute('src').endsWith('.xbm')) {
                 let queryPathFull = new URL(pageImage.getAttribute('src'), sourcePath).href,
                     queryPath = queryPathFull.substring((rootPath + 'einblicke/').length);
                 
                 imageIndex = list[1].findIndex(img => img.path == queryPath);
             }
+            else {
+                pageImage.src = await parseXBM(new URL(pageImage.getAttribute('src'), sourcePath).href);
+                continue;
+            }
             
             if (imageIndex != -1) {
                 pageImage.src = rootPath + 'einblicke/' + list[1][imageIndex].path;
             }
-            else {
-                if (pageImage.hasAttribute('alt'))
-                    pageImage.insertAdjacentText('afterend', pageImage.alt);
-                else if (pageImage.src && pageImage.src.length > 1)
-                    pageImage.insertAdjacentText('afterend', ' ' + pageImage.src.substring(pageImage.src.lastIndexOf("/") + 1) + ' ');
-                
-                pageImage.remove();
-            }
-        });
+            else
+                sanitizeImage(pageImage);
+        }
         
         // Fix <marquee> instances using a very old and unsupported format
         pageDocument.querySelectorAll('marquee').forEach(oldMarquee => {
@@ -366,11 +444,10 @@ function compareURLs(...urls) {
         document.querySelector('#page > div').innerHTML = pageDocument.documentElement.innerHTML;
         
         // Redirect links to archival sites
-        for (let l = 0; l < document.querySelectorAll('#page > div a[href]').length; l++) {
+        for (let pageLink of document.querySelectorAll('#page > div a[href]')) {
             await new Promise(resolve => setTimeout(resolve));
             
-            let pageLink = document.querySelectorAll('#page > div a[href]')[l],
-                fullURL;
+            let fullURL;
             
             try {
                 fullURL = new URL(pageLink.getAttribute('href'), list[sourceID][targetID].url).href;

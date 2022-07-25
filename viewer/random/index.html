@@ -19,7 +19,11 @@
                     source      = (randomIndex >= list[0].length ? 'einblicke' : 'jamsa'),
                     sourceID    = (source == 'jamsa' ? 0 : 1),
                     actualIndex = (source == 'jamsa' ? randomIndex : randomIndex - list[0].length),
-                    url = list[sourceID][actualIndex].url.replaceAll('#', '%23').replaceAll('?', '%3F').replaceAll('&', '%26');
+                    url = list[sourceID][actualIndex].url
+                        .replaceAll('#', '%23')
+                        .replaceAll('?', '%3F')
+                        .replaceAll('&', '%26')
+                        .replaceAll('+', '%2B');
                 
                 window.location.replace('../?source=' + source + '&url=' + url);
             })();

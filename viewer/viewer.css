@@ -39,13 +39,29 @@ body {
 #links a {
     padding-right: 8px;
 }
+#picture,
 #dice {
     flex: 0 0 72px;
 }
-#dice img {
+#picture a,
+#dice a {
+    display: inline-block;
     position: relative;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
+    width: 48px;
+}
+#picture a {
+    height: 36px;
+}
+#dice a {
+    height: 48px;
+}
+#picture img,
+#dice img {
+    width: inherit;
+    height: inherit;
+    object-fit: cover;
 }
 
 /* Embedded page styling */
@@ -57,10 +73,15 @@ body {
 #page > div > a:first-child > :is(h1, h2, h3, h4, h5, h6, p):first-child {
     margin-top: 0;
 }
-#page > div br ~ img,
-#page > div br ~ a > img:first-child {
-    margin-top: -3.5px;
-    margin-bottom: -3.5px;
+#page > div img:not([src]) {
+    display: inline-block;
+    overflow: hidden;
+}
+#page > div a img[border] {
+    border-color: #00f;
+}
+#page > div a img:not([border]) {
+    border: 2px solid #00f;
 }
 #page > div dl > dl {
     margin: 0 0 0 40px;

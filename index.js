@@ -21,12 +21,19 @@ function loadJSON(url) {
 let homogenizeURL = url => {
     url = decodeURIComponent(url);
     url = url.toLowerCase();
-    url = url.includes('index.htm') ? url.substring(0, url.indexOf('index.htm')) : url;
+    // url = url.includes('index.htm') ? url.substring(0, url.indexOf('index.htm')) : url;
     url = url.startsWith('http://www.') ? 'http://' + url.substring('http://www.'.length) : url;
     url = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
     
     return url;
 }
+
+// Encode problematic characters
+let encodeString = string => string
+    .replaceAll('#', '%23')
+    .replaceAll('?', '%3F')
+    .replaceAll('&', '%26')
+    .replaceAll('+', '%2B');
 
 // Search the databases and display results in a table
 async function performSearch() {
@@ -104,12 +111,12 @@ async function performSearch() {
         
         if (results[i].availability <= 2) {
             linkLeft = document.createElement('a');
-            linkLeft.href = 'viewer/?source=jamsa&url=' + results[i].url.replaceAll('#', '%23').replaceAll('&', '%26');
+            linkLeft.href = 'viewer/?source=jamsa&url=' + encodeString(results[i].url);
             linkLeft.textContent = 'Jamsa';
         }
         if (results[i].availability >= 2) {
             linkRight = document.createElement('a');
-            linkRight.href = 'viewer/?source=einblicke&url=' + results[i].url.replaceAll('#', '%23').replaceAll('?', '%3F').replaceAll('&', '%26');
+            linkRight.href = 'viewer/?source=einblicke&url=' + encodeString(results[i].url);
             linkRight.textContent = 'Einblicke';
         }
         
@@ -131,7 +138,7 @@ async function performSearch() {
 };
 
 // Update query string in order to prepare the search
-function updateURL() { location.replace('./?query=' + document.querySelector('#search input').value.replaceAll('#', '%23').replaceAll('&', '%26')) }
+function updateURL() { location.replace('./?query=' + encodeString(document.querySelector('#search input').value)) }
 
 // Load JSON data if it hasn't been already, then initiate the search
 async function prepareSearch() {
