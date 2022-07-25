@@ -316,27 +316,26 @@ async function parseXBM(url) {
             });
             
             // Revert changes to links
-            // To-do: Fix http://www.ncsa.uiuc.edu/General/NCSAHome.html
             pageDocument.querySelectorAll('a[href$="fehler.htm"]:not([href^="http://"])').forEach(pageLink => {
                 let nextNode = pageLink.nextSibling;
                 
-                if (nextNode) {
-                    if (nextNode.nodeName != '#text' && nextNode.childNodes.length > 0)
-                        nextNode = nextNode.childNodes[0];
-                        
-                    let nextElement = nextNode.nextSibling;
+                if (nextNode === null)
+                    nextNode = pageLink.parentNode.nextSibling;
+                if (nextNode.nodeName != '#text' && nextNode.childNodes.length > 0)
+                    nextNode = nextNode.childNodes[0];
+                
+                let nextElement = nextNode.nextSibling;
+                
+                if (nextNode !== null && nextNode.textContent.endsWith('[[')
+                 && nextElement && nextElement.nodeName == 'A' && nextElement.textContent == 'Net'
+                 && nextElement.nextSibling && nextElement.nextSibling.textContent.startsWith(']]')) {
+                    pageLink.href = nextElement.href;
                     
-                    if (nextNode.textContent.endsWith('[[')
-                     && nextElement && nextElement.nodeName == 'A' && nextElement.textContent == 'Net'
-                     && nextElement.nextSibling && nextElement.nextSibling.textContent.startsWith(']]')) {
-                        pageLink.href = nextElement.href;
-                        
-                        pageLink.nextSibling.remove();
-                        nextElement.nextSibling.textContent = nextElement.nextSibling.textContent.substring(2);
-                        nextElement.remove();
-                        
-                        return;
-                    }
+                    nextNode.remove();
+                    nextElement.nextSibling.textContent = nextElement.nextSibling.textContent.substring(2);
+                    nextElement.remove();
+                    
+                    return;
                 }
                 
                 pageLink.replaceWith(...pageLink.childNodes);
