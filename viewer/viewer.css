@@ -77,10 +77,13 @@ body {
     display: inline-block;
     overflow: hidden;
 }
+#page > div img:not([src])[alt=""] {
+    display: none;
+}
 #page > div a img[border] {
     border-color: #00f;
 }
-#page > div a img:not([border]) {
+#page > div a img:not([border]):is([width], [height]) {
     border: 2px solid #00f;
 }
 #page > div dl > dl {

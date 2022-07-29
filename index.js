@@ -21,7 +21,6 @@ function loadJSON(url) {
 let homogenizeURL = url => {
     url = decodeURIComponent(url);
     url = url.toLowerCase();
-    // url = url.includes('index.htm') ? url.substring(0, url.indexOf('index.htm')) : url;
     url = url.startsWith('http://www.') ? 'http://' + url.substring('http://www.'.length) : url;
     url = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
     

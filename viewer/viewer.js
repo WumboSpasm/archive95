@@ -21,8 +21,8 @@ function compareURLs(...urls) {
     
     urls = urls
         .map(url => url.toLowerCase())
-        // .map(url => url.includes('/index.htm') ? url.substring(0, url.indexOf('/index.htm')) : url)
-        .map(url => url.startsWith('http://www.') ? 'http://' + url.substring('http://www.'.length) : url)
+        .map(url => url.startsWith('http://') ? url.substring('http://'.length) : url)
+        .map(url => url.startsWith('www.') ? url.substring('www.'.length) : url)
         .map(url => url.endsWith('/') ? url.substring(0, url.length - 1) : url);
     
     return urls[0] == urls[1];
@@ -214,6 +214,13 @@ async function parseXBM(url) {
                 imageEmbed.src = window.URL.createObjectURL(this.response);
             
             document.querySelector('#page > div').append(imageEmbed);
+            return;
+        }
+        else if (sourcePath.endsWith('.wav')) {
+            let audioEmbed = document.createElement('audio');
+            audioEmbed.src = window.URL.createObjectURL(this.response);
+            audioEmbed.controls = true;
+            document.querySelector('#page > div').append(audioEmbed);
             return;
         }
         else if (!sourcePath.endsWith('.htm')) {
