@@ -323,11 +323,16 @@ async function parseXBM(url) {
             });
             
             // Revert changes to links
+            // To-do: Come up with a better solution to http://golgi.harvard.edu/biopages/all.html
             pageDocument.querySelectorAll('a[href$="fehler.htm"]:not([href^="http://"])').forEach(pageLink => {
                 let nextNode = pageLink.nextSibling;
                 
                 if (nextNode === null)
                     nextNode = pageLink.parentNode.nextSibling;
+                if (nextNode == undefined) {
+                    pageLink.replaceWith(...pageLink.childNodes);
+                    return;
+                }
                 if (nextNode.nodeName != '#text' && nextNode.childNodes.length > 0)
                     nextNode = nextNode.childNodes[0];
                 
