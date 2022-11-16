@@ -294,7 +294,7 @@ async function parseXBM(url) {
         if (query.get('source') == 'einblicke') {
             pageMarkup = pageMarkup.replaceAll(
                 // Remove footer
-                /(\r?)\n<hr>(\r?)\nOriginal: .*? \[\[<a href=".*?">Net<\/a>\]\](\r?)\n$/gi,
+                /(\r?)(\n?)<hr>(\r?)(\n?)Original: .*? \[\[<a href=".*?">Net<\/a>\]\](\r?)(\n?)$/gi,
                 ''
             ).replaceAll(
                 // Remove duplicate alt attribute
@@ -302,11 +302,11 @@ async function parseXBM(url) {
                 '$1"'
             ).replaceAll(
                 // Remove broken page warning
-                /^<html><body>(\r?)\n<img src=".*?noise\.gif">(\r?)\n<strong>Vorsicht: Diese Seite k&ouml;nnte defekt sein!<\/strong>(\r?)\n(\r?)\n<hr>(\r?)\n/gi,
+                /^<html><body>(\r?)(\n?)<img src=".*?noise\.gif">(\r?)(\n?)<strong>Vorsicht: Diese Seite k&ouml;nnte defekt sein!<\/strong>(\r?)(\n?)(\r?)(\n?)<hr>(\r?)(\n?)/gi,
                 ''
             ).replaceAll(
                 // Replace missing form elements with neater placeholder
-                /<p>(\r?)\n<strong>Hier sollte eigentlich ein Dialog stattfinden!<\/strong>(\r?)\n\[\[<a href=".*?">Net<\/a>\]\](\r?)\n<p>(\r?)\n/gi,
+                /<p>(\r?)(\n?)<strong>Hier sollte eigentlich ein Dialog stattfinden!<\/strong>(\r?)(\n?)\[\[<a href=".*?">Net<\/a>\]\](\r?)(\n?)<p>(\r?)(\n?)/gi,
                 '<p>[[Einblicke ins Internet form placeholder]]</p>'
             )
         }
