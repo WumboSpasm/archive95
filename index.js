@@ -85,7 +85,7 @@ async function performSearch() {
     }
     
     // Combine, then prepare results to remove duplicates
-    let results = [...resultsUnsorted].sort((a, b) => homogenizeURL(a.url) > homogenizeURL(b.url));
+    let results = [...resultsUnsorted].sort((a, b) => homogenizeURL(a.url) >= homogenizeURL(b.url) ? 1 : -1);
     
     // Remove duplicate results
     for (let i = 0; i < results.length - 1; i++) {
@@ -100,9 +100,9 @@ async function performSearch() {
     // Properly sort results now that duplicates are gone
     results.sort((a, b) => {
         if (a.title.length == 0 && b.title.length == 0)
-            return homogenizeURL(a.url) > homogenizeURL(b.url);
+            return homogenizeURL(a.url) >= homogenizeURL(b.url) ? 1 : -1;
         else
-            return a.title.toLowerCase() > b.title.toLowerCase();
+            return a.title.toLowerCase() >= b.title.toLowerCase() ? 1 : -1;
     });
     
     // Populate table with search results
