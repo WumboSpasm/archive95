@@ -406,6 +406,9 @@ async function parseXBM(url) {
         
         // Update image locations, or replace with placeholder if they don't exist in the archive
         for (let pageImage of pageDocument.querySelectorAll('img')) {
+            if (pageImage.hasAttribute('ismap'))
+                pageImage.removeAttribute('ismap');
+            
             if (!pageImage.hasAttribute('src'))
                 continue;
             
