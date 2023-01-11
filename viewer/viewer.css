@@ -24,7 +24,7 @@ body {
 #info > div {
     padding: 2px;
 }
-#url,
+#url span,
 #source > a {
     font-weight: bold;
 }
@@ -32,6 +32,24 @@ body {
 #switch,
 #links a {
     display: inline-block;
+}
+#url > div {
+    display: none;
+    vertical-align: bottom;
+    width: 8px;
+    height: 8px;
+    border: 2px solid #000;
+    border-radius: 8px;
+    margin: 0 0 3px 7px;
+    padding: 0 !important;
+    animation: spin 1s linear infinite;
+}
+#url > div > div {
+    display: inline-block;
+    margin: 0 0 4px -2px;
+    width: 6px;
+    height: 6px;
+    background-color: #fff;
 }
 #source {
     margin-right: 3px;
@@ -62,6 +80,11 @@ body {
     width: inherit;
     height: inherit;
     object-fit: cover;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Embedded page styling */

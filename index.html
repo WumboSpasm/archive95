@@ -12,6 +12,16 @@
             <input type="text">
             <button type="button">Search</button>
             <div>
+                <input type="radio" id="search-everything" name="search-type">
+                <label for="search-everything">Everything</label>
+                
+                <input type="radio" id="search-html" name="search-type">
+                <label for="search-html">HTML only</label>
+                
+                <input type="radio" id="search-media" name="search-type">
+                <label for="search-media">Media only</label>
+            </div>
+            <div>
                 <a href="javascript:void(document.querySelector('#info').hidden ^= true)">More information</a>
                 <a href="viewer/random">Go to random file</a>
             </div>

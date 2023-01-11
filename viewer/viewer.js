@@ -149,7 +149,7 @@ async function parseXBM(url) {
      | Fill in data at bottom of screen |
      +----------------------------------*/
     // URL text
-    document.querySelector('#url').textContent = decodeURIComponent(list[sourceID][targetID].url);
+    document.querySelector('#url span').textContent = decodeURIComponent(list[sourceID][targetID].url);
     // Search domain
     {
         let host = new URL(list[sourceID][targetID].url).hostname;
@@ -241,6 +241,9 @@ async function parseXBM(url) {
             return;
         }
         
+        // Display loading icon
+        document.querySelector('#url > div').style.display = 'inline-block';
+        
         // Fix bad markup that can hide large portions of a page in modern browsers
         {
             let lessThan = pageMarkup.indexOf('<');
@@ -323,14 +326,13 @@ async function parseXBM(url) {
             });
             
             // Revert changes to links
-            // To-do: Come up with a better solution to http://golgi.harvard.edu/biopages/all.html
             pageDocument.querySelectorAll('a[href$="fehler.htm"]:not([href^="http://"])').forEach(pageLink => {
                 let nextNode = pageLink.nextSibling;
                 
                 if (nextNode === null)
                     nextNode = pageLink.parentNode.nextSibling;
                 if (nextNode == undefined) {
-                    pageLink.replaceWith(...pageLink.childNodes);
+                    pageLink.href = '#';
                     return;
                 }
                 if (nextNode.nodeName != '#text' && nextNode.childNodes.length > 0)
@@ -505,6 +507,9 @@ async function parseXBM(url) {
                     pageLink.href = 'https://web.archive.org/web/0/' + fullURL;
                 }
             }
-        };
+        }
+        
+        // Hide loading icon now that the page has loaded
+        document.querySelector('#url > div').style.display = 'none';
     };
-})()
+})();

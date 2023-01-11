@@ -1,6 +1,7 @@
 // Important data required to perform searches
 let data = {
     query: new URLSearchParams(location.search).get('query'),
+    filter: new URLSearchParams(location.search).get('filter'),
     jamsa: [],
     einblicke: [],
     ready: false
@@ -54,7 +55,7 @@ async function performSearch() {
         if (i % 500 == 0)
             await new Promise(resolve => setTimeout(resolve));
         
-        if (i < data.jamsa.length) {
+        if (i < data.jamsa.length && data.filter != 'media') {
             let parsedTitle = new DOMParser().parseFromString(data.jamsa[i].title, 'text/html').body.textContent;
         
             if (parsedTitle.toLowerCase().includes(data.query.toLowerCase())
@@ -63,7 +64,8 @@ async function performSearch() {
                 resultsUnsorted.push( { title: parsedTitle, url: data.jamsa[i].url, source: 'jamsa', availability: 1 } );
         }
         
-        if (!data.einblicke[i].path.endsWith('.htm'))
+        if ((data.filter == 'html'  && !data.einblicke[i].path.endsWith('.htm'))
+         || (data.filter == 'media' &&  data.einblicke[i].path.endsWith('.htm')))
             continue;
         
         let parsedTitle = new DOMParser().parseFromString(data.einblicke[i].title, 'text/html').body.textContent,
@@ -119,70 +121,72 @@ async function performSearch() {
             linkRight.textContent = 'Einblicke';
         }
         
-        addTableRow(document.querySelector('#results table'), results[i].title, results[i].url, linkLeft, linkRight);
+        // Automatically add rows to the desired table
+        let row = document.createElement('tr');
+        
+        [results[i].title, results[i].url, linkLeft, linkRight].forEach(str => {
+            let col = document.createElement('td');
+            col.append(str);
+            row.append(col);
+        });
+        
+        document.querySelector('#results table').append(row);
     }
     
     // Display table
     document.querySelector('#results table').hidden = false;
     
     // Display search result information
+    document.querySelector('#results span').textContent = results.length + ' results for: ';
+    
     if (data.query) {
-        document.querySelector('#results span').textContent = results.length + ' results for: ';
         document.querySelector('#results b').textContent = data.query;
     }
     else {
-        document.querySelector('#results span').textContent = results.length + ' total pages in the archive';
         document.querySelector('#results b').textContent = '';
     }
 };
 
 // Update query string in order to prepare the search
-function updateURL() { location.replace('./?query=' + encodeString(document.querySelector('#search input').value)) }
-
-// Load JSON data if it hasn't been already, then initiate the search
-async function prepareSearch() {
-    if (!data.ready) {
-        dataArray = await Promise.all([loadJSON('data/jamsa.json'), loadJSON('data/einblicke.json')]);
-        
-        data.jamsa     = dataArray[0];
-        data.einblicke = dataArray[1];
-        data.ready     = true;
-    }
+function updateURL() {
+    let newURL = './?query=' + encodeString(document.querySelector('#search input').value);
     
-    performSearch();
+    if (document.querySelector('#search-html').checked)
+        newURL += '&filter=html';
+    else if (document.querySelector('#search-media').checked)
+        newURL += '&filter=media';
+    
+    location.replace(newURL);
 }
 
 // Prepare search when prompted
 document.querySelector('#search input').addEventListener('keydown', key => { if (key.code == 'Enter') updateURL() });
 document.querySelector('#search button').addEventListener('click', updateURL);
 
-// Prepare search automatically if URL already contains a query string
-if (data.query || data.query == '')
-    prepareSearch();
-
-// Automatically add rows to the desired table
-function addTableRow(table, ...args) {
-    let row = document.createElement('tr');
-    
-    for (let i = 0; i < args.length; i++) {
-        let item = document.createElement('td');
-        item.append(args[i]);
-        row.append(item);
-    }
-    
-    table.append(row);
+// Select appropriate filter option
+switch (data.filter) {
+    case 'html':
+        document.querySelector('#search-html').checked = true;
+        break;
+    case 'media':
+        document.querySelector('#search-media').checked = true;
+        break;
+    default:
+        document.querySelector('#search-everything').checked = true;
 }
 
-// Correctly compare URLs
-function compareURLs(...urls) {
-    if (urls.length > 2)
-        urls = urls.slice(0, 2);
-    
-    urls = urls
-        .map(url => url.toLowerCase())
-        .map(url => url.includes('index.htm') ? url.substring(0, url.indexOf('index.htm')) : url)
-        .map(url => url.startsWith('http://www.') ? 'http://' + url.substring('http://www.'.length) : url)
-        .map(url => url.endsWith('/') ? url.substring(0, url.length - 1) : url);
-    
-    return urls[0] == urls[1];
+// Prepare search automatically if URL already contains a query string
+if (data.query || data.query == '') {
+    (async () => {
+        // Load JSON data if it hasn't been already
+        if (!data.ready) {
+            dataArray = await Promise.all([loadJSON('data/jamsa.json'), loadJSON('data/einblicke.json')]);
+            
+            data.jamsa     = dataArray[0];
+            data.einblicke = dataArray[1];
+            data.ready     = true;
+        }
+        
+        performSearch();
+    })();
 }

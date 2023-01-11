@@ -6,12 +6,12 @@ img {
     display: block;
     margin: 0 auto 16px;
 }
-#search input {
+#search input[type="text"] {
     width: 288px;
     margin-right: 4px;
 }
 #search div {
-    margin-top: 8px;
+    padding: 8px 0;
 }
 #search div a {
     display: inline-block;
@@ -19,11 +19,11 @@ img {
 }
 #info {
     width: 600px;
-    margin-top: 16px;
+    margin-top: 8px;
     text-align: left;
 }
 #results {
-    margin-top: 16px;
+    margin-top: 8px;
 }
 #results table {
     width: 1152px;
