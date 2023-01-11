@@ -92,8 +92,8 @@ body {
     white-space: pre-wrap;
     margin: 0;
 }
-#page > div > :first-child:is(h1, h2, h3, h4, h5, h6, p),
-#page > div > a:first-child > :is(h1, h2, h3, h4, h5, h6, p):first-child {
+#page > div > :first-child:is(h1, h2, h3, h4, h5, h6, p, pre),
+#page > div > a:first-child > :is(h1, h2, h3, h4, h5, h6, p, pre):first-child {
     margin-top: 0;
 }
 #page > div img:not([src]) {
