@@ -2,15 +2,7 @@
  | Helpful functions |
  +-------------------*/
 // Retrieve JSON data
-function loadJSON(url) {
-    return new Promise(resolve => {
-        let request = new XMLHttpRequest();
-        request.open('GET', url);
-        request.responseType = 'json';
-        request.send();
-        request.onload = function() { resolve(this.response) };
-    });
-}
+let loadJSON = url => fetch(url).then(r => r.json());
 
 // Correctly compare URLs
 function compareURLs(...urls) {
@@ -42,59 +34,40 @@ function sanitizeImage(pageImage, useFilename = true) {
 
 // Parse XBM files
 async function parseXBM(url) {
-    let xbmData = await new Promise(resolve => {
-        let xbmRequest = new XMLHttpRequest();
-        xbmRequest.open('GET', url);
-        xbmRequest.responseType = 'text';
-        xbmRequest.send();
-        xbmRequest.onload = function() { resolve(this.response) };
-    });
-    
-    let xbmWidth  = parseInt(xbmData.replace(/.*_width ([0-9]*).*/is, '$1')),
-        xbmHeight = parseInt(xbmData.replace(/.*_height ([0-9]*).*/is, '$1')),
-        
-        xbmArray  = new Function('return [' + xbmData.replace(/.*\{(.*?)\}.*/is, '$1') + ']')(),
-        
+    let data = await fetch(url).then(r => r.text()),
+        width = parseInt(data.replace(/.*_width ([0-9]*)/is, '$1')),
+        height = parseInt(data.replace(/.*_height ([0-9]*)/is, '$1')),
         canvas = document.createElement('canvas'),
-        ctx = canvas.getContext('2d', { alpha: false }),
-        
-        xbmDrawing = ctx.createImageData(xbmWidth, xbmHeight),
-        xbmOffset  = 0;
+        ctx = canvas.getContext('2d'),
+        drawing = ctx.createImageData(width, height),
+        bytes = new Function(`return [${data.replace(/.*\{(.*?)\}.*/is, '$1')}]`)().slice(0, width * height),
+        offset = 0;
     
-    if (xbmArray.length > xbmWidth * xbmHeight)
-        xbmArray = xbmArray.slice(0, xbmWidth * xbmHeight);
-    
-    for (let byte of xbmArray) {
-        let bits = (byte >> 0)
-            .toString(2)
-            .padStart(8, '0')
-            .split('')
-            .map(b => parseInt(b))
-            .reverse();
+    for (let byte of bytes) {
+        let bits = (0xFF - byte).toString(2).padStart(8, '0');
         
-        for (let b = 0; b < bits.length; b++) {
-            if (xbmWidth % 8 != 0 && (xbmOffset / 4) % xbmWidth == 0 && b == xbmWidth % 8)
-                break;
-            
+        for (let b = 7; b >= 0; b--) {
+            if ((offset / 4) % width == 0 && 7 - b == width % 8) break;
+
             for (let c = 0; c < 3; c++)
-                xbmDrawing.data[xbmOffset + c] = ((bits[b] + 1) % 2) * 255;
+                drawing.data[offset + c] = parseInt(bits[b]) * 255;
             
-            xbmDrawing.data[xbmOffset + 3] = 255;
-            
-            xbmOffset += 4;
+            drawing.data[offset + 3] = 255;
+
+            offset += 4;
         }
     }
     
-    canvas.width  = xbmWidth;
-    canvas.height = xbmHeight;
+    canvas.width  = width;
+    canvas.height = height;
     
-    ctx.putImageData(xbmDrawing, 0, 0);
+    ctx.putImageData(drawing, 0, 0);
     
     return canvas.toDataURL();
 }
 
 // Handle everything
-(async function updatePage() {
+(async () => {
     let list = await Promise.all([loadJSON('../data/jamsa.json'), loadJSON('../data/einblicke.json')]);
     
     /*------------------+
@@ -188,14 +161,7 @@ async function parseXBM(url) {
     /*-------------------------------+
      | Load and modify embedded page |
      +-------------------------------*/
-    let pageRequest = new XMLHttpRequest();
-    pageRequest.open('GET', sourcePath);
-    
-    if (!sourcePath.endsWith('.htm'))
-        pageRequest.responseType = 'blob';
-    
-    pageRequest.send();
-    pageRequest.onload = async function() {
+    fetch(sourcePath).then(r => sourcePath.endsWith('.htm') ? r.text() : r.blob()).then(async response => {
         // Apply page title to parent
         if (list[sourceID][targetID].title != undefined && list[sourceID][targetID].title != '') {
             let parsedTitle = new DOMParser().parseFromString(list[sourceID][targetID].title, 'text/html').body.textContent;
@@ -211,27 +177,27 @@ async function parseXBM(url) {
             if (sourcePath.endsWith('.xbm'))
                 imageEmbed.src = await parseXBM(sourcePath);
             else
-                imageEmbed.src = window.URL.createObjectURL(this.response);
+                imageEmbed.src = window.URL.createObjectURL(response);
             
             document.querySelector('#page > div').append(imageEmbed);
             return;
         }
         else if (sourcePath.endsWith('.wav')) {
             let audioEmbed = document.createElement('audio');
-            audioEmbed.src = window.URL.createObjectURL(this.response);
+            audioEmbed.src = window.URL.createObjectURL(response);
             audioEmbed.controls = true;
             document.querySelector('#page > div').append(audioEmbed);
             return;
         }
         else if (!sourcePath.endsWith('.htm')) {
             let fileLink = document.createElement('a');
-            fileLink.href = window.URL.createObjectURL(this.response);
+            fileLink.href = window.URL.createObjectURL(response);
             fileLink.download = query.get('url').substring(query.get('url').lastIndexOf('/') + 1);
             fileLink.dispatchEvent(new MouseEvent('click'));
             return;
         }
         
-        let pageMarkup = this.response;
+        let pageMarkup = response;
         
         // Handle plaintext pages
         if (list[sourceID][targetID].plaintext) {
@@ -514,5 +480,5 @@ async function parseXBM(url) {
         
         // Hide loading icon now that the page has loaded
         document.querySelector('#url > div').style.display = 'none';
-    };
+    });
 })();

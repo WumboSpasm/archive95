@@ -8,15 +8,7 @@ let data = {
 }
 
 // Retrieve JSON data
-function loadJSON(url) {
-    return new Promise((resolve, reject) => {
-        let request = new XMLHttpRequest();
-        request.open('GET', url);
-        request.responseType = 'json';
-        request.send();
-        request.onload = function() { resolve(this.response) };
-    });
-}
+let loadJSON = url => fetch(url).then(r => r.json());
 
 // Correctly compare URLs
 let homogenizeURL = url => {
