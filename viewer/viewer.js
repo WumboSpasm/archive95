@@ -410,18 +410,9 @@ async function parseXBM(url) {
             oldMarquee.replaceWith(newMarquee, ...oldMarquee.childNodes);
         });
         
-        // Remove unneeded HTML tags/elements
-        {
-            let unneededElements = [ 'head', 'header', 'link', 'meta', 'form' ],
-                unneededTags = [ 'title', 'base', 'nextid' ];
-            
-            pageDocument.querySelectorAll('*').forEach(node => {
-                if (unneededElements.includes(node.nodeName.toLowerCase()))
-                    node.replaceWith(...node.childNodes);
-                else if (unneededTags.includes(node.nodeName.toLowerCase()))
-                    node.remove();
-            });
-        }
+        // Get rid of unneeded HTML tags
+        pageDocument.querySelectorAll(':is(base, form, head, header, link, meta, nextid)').forEach(node => node.replaceWith(...node.childNodes));
+        pageDocument.querySelectorAll('title').forEach(node => node.remove());
         
         // Apply modified HTML to div
         document.querySelector('#page > div').innerHTML = pageDocument.documentElement.innerHTML;
