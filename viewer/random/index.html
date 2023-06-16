@@ -3,22 +3,24 @@
     <head>
         <title>Taking you to a random file...</title>
         <script>
-            let loadJSON = url => fetch(url).then(r => r.json());
-            
-            (async () => {
-                let list        = await Promise.all([loadJSON('../../data/jamsa.json'), loadJSON('../../data/einblicke.json')]),
-                    randomIndex = Math.floor(Math.random() * (list[0].length + list[1].length)),
-                    source      = (randomIndex >= list[0].length ? 'einblicke' : 'jamsa'),
-                    sourceID    = (source == 'jamsa' ? 0 : 1),
-                    actualIndex = (source == 'jamsa' ? randomIndex : randomIndex - list[0].length),
-                    url = list[sourceID][actualIndex].url
-                        .replaceAll('#', '%23')
-                        .replaceAll('?', '%3F')
-                        .replaceAll('&', '%26')
-                        .replaceAll('+', '%2B');
+            fetch('../../data.json').then(r => r.json()).then(json => {
+                let entryNum = Math.floor(Math.random() * json.reduce((sum, source) => sum + source.entries.length, 0));
                 
-                window.location.replace('../?source=' + source + '&url=' + url);
-            })();
+                for (let source of json) {
+                    if (entryNum >= source.entries.length)
+                        entryNum -= source.entries.length;
+                    else {
+                        let url = source.entries[entryNum].url
+                            .replace(/\#/g, '%23')
+                            .replace(/\?/g, '%3F')
+                            .replace(/\&/g, '%26')
+                            .replace(/\+/g, '%2B');
+                        
+                        location.replace('../?source=' + source.id + '&url=' + url);
+                        break;
+                    }
+                }
+            });
         </script>
     </head>
 </html>

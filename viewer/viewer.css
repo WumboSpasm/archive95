@@ -25,16 +25,15 @@ body {
     padding: 2px;
 }
 #url span,
-#source > a {
+#source > a:first-of-type {
     font-weight: bold;
 }
 #source,
-#switch,
 #links a {
     display: inline-block;
 }
 #url > div {
-    display: none;
+    display: inline-block;
     vertical-align: bottom;
     width: 8px;
     height: 8px;
@@ -53,6 +52,9 @@ body {
 }
 #source {
     margin-right: 3px;
+}
+#source a:not(:first-of-type) {
+    padding-left: 8px;
 }
 #links a {
     padding-right: 8px;
@@ -80,6 +82,17 @@ body {
     width: inherit;
     height: inherit;
     object-fit: cover;
+}
+
+#error {
+    padding: 8px 12px;
+}
+#error b {
+    font-size: 36px;
+}
+#message {
+    display: block;
+    margin: 8px 0 12px;
 }
 
 @keyframes spin {

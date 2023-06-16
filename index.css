@@ -19,7 +19,7 @@ img {
 }
 #info {
     width: 600px;
-    margin-top: 8px;
+    margin: 8px auto 16px;
     text-align: left;
 }
 #results {
@@ -37,12 +37,12 @@ img {
     padding: 4px;
     border: 1px solid #000;
 }
-#results table th:last-child {
-    width: 144px;
-}
 #results table td:nth-child(-n+2) {
     text-align: left;
 }
 #results table td:nth-child(2) {
     word-break: break-all;
+}
+#results table th:nth-child(3) {
+    width: 6ch;
 }

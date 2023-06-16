@@ -1,21 +1,15 @@
 /*-------------------+
  | Helpful functions |
  +-------------------*/
-// Retrieve JSON data
-let loadJSON = url => fetch(url).then(r => r.json());
 
 // Correctly compare URLs
 function compareURLs(...urls) {
     if (urls.length > 2)
         urls = urls.slice(0, 2);
     
-    try { urls = urls.map(url => decodeURIComponent(url)) } catch { }
-    
-    urls = urls
-        .map(url => url.toLowerCase())
-        .map(url => url.startsWith('http://') ? url.substring('http://'.length) : url)
-        .map(url => url.startsWith('www.') ? url.substring('www.'.length) : url)
-        .map(url => url.endsWith('/') ? url.substring(0, url.length - 1) : url);
+    urls = urls.map(url => {
+        try { return decodeURIComponent(url); } catch { }
+    }).map(url => url.toLowerCase().replace(/^http:\/\/(www\.|)/i, '').replace(/\/$/, ''));
     
     return urls[0] == urls[1];
 }
@@ -24,7 +18,7 @@ function compareURLs(...urls) {
 function sanitizeImage(pageImage, useFilename = true) {
     if (!pageImage.hasAttribute('alt')) {
         if (useFilename && pageImage.hasAttribute('src') && pageImage.src.length > 1)
-            pageImage.alt = pageImage.src.substring(pageImage.src.lastIndexOf("/") + 1, pageImage.src.lastIndexOf('.'));
+            pageImage.alt = pageImage.src.substring(pageImage.src.lastIndexOf('/') + 1, pageImage.src.lastIndexOf('.'));
         else
             pageImage.alt = '[image]'
     }
@@ -35,11 +29,14 @@ function sanitizeImage(pageImage, useFilename = true) {
 // Parse XBM files
 async function parseXBM(url) {
     let data = await fetch(url).then(r => r.text()),
+    
         width = parseInt(data.replace(/.*_width ([0-9]*)/is, '$1')),
         height = parseInt(data.replace(/.*_height ([0-9]*)/is, '$1')),
+        
         canvas = document.createElement('canvas'),
         ctx = canvas.getContext('2d'),
         drawing = ctx.createImageData(width, height),
+        
         bytes = new Function(`return [${data.replace(/.*\{(.*?)\}.*/is, '$1')}]`)().slice(0, width * height),
         offset = 0;
     
@@ -66,93 +63,98 @@ async function parseXBM(url) {
     return canvas.toDataURL();
 }
 
+// Replace page content with error message
+function displayError(message) {
+    document.querySelectorAll('#page, #footer').forEach(elem => elem.remove());
+    let error = document.querySelector('#error');
+    error.hidden = false;
+    error.querySelector('#message').innerText = message;
+}
+
 // Handle everything
-(async () => {
-    let list = await Promise.all([loadJSON('../data/jamsa.json'), loadJSON('../data/einblicke.json')]);
-    
+fetch('../data.json').then(r => r.json()).then(json => {
     /*------------------+
      | Get query string |
      +------------------*/
     let query = new URLSearchParams(location.search);
     
     if (!query.has('url')) {
-        alert('No URL was specified!');
-        window.location.replace('../');
+        displayError('No URL was specified.');
         return;
     }
     
-    let sourceID, targetID;
+    let sourceIndex = -1,
+        entryIndex  = -1;
     
     // If source is specified, expect URL to reside inside it
     if (query.has('source')) {
-        sourceID = query.get('source') == 'jamsa' ? 0 : 1;
-        targetID = targetID = list[sourceID].findIndex(file => compareURLs(file.url, query.get('url')));
+        let querySource = query.get('source').toLowerCase();
+        sourceIndex = json.findIndex(source => querySource == source.id.toLowerCase());
+        
+        if (sourceIndex != -1)
+            entryIndex = json[sourceIndex].entries.findIndex(entry => compareURLs(entry.url, query.get('url')));
+        else {
+            displayError('The specified source is invalid.');
+            return;
+        }
     }
     // Otherwise, search the entire database for the URL
     else {
-        let urlExists = list.some((source, id) => {
-            let fileIndex = source.findIndex(file => compareURLs(file.url, query.get('url')));
+        json.some((source, s) => {
+            let foundEntry = source.entries.some((entry, e) => {
+                if (compareURLs(entry.url, query.get('url'))) {
+                    sourceIndex = s;
+                    entryIndex  = e;
+                    query.append('source', source.id);
+                    return true;
+                }
+            });
             
-            if (fileIndex != -1) {
-                sourceID = id;
-                targetID = fileIndex;
-                query.append('source', id == 0 ? 'jamsa' : 'einblicke');
-                
-                return true;
-            }
+            if (foundEntry) return true;
         });
-        
-        if (!urlExists)
-            targetID = -1;
     }
     
     // Redirect to homepage if URL doesn't exist in list
-    if (targetID == -1) {
-        alert('The URL ' + query.get('url') + ' does not exist in the archive!');
-        window.location.replace('../');
+    if (entryIndex == -1) {
+        displayError('The specified URL does not exist in the archive.');
         return;
     }
     
-    let rootPath    = 'https://archive.org/download/1995archive/1995archive.zip/',
-        sourcePath  = query.get('source') == 'jamsa'
-                    ? (rootPath + 'jamsa/' + targetID + '.htm')
-                    : (rootPath + 'einblicke/' + list[sourceID][targetID].path);
+    let source = json[sourceIndex],
+        entry  = source.entries[entryIndex],
+    
+        archiveURL = 'https://archive.org/download/1995archive/1995archive.zip/',
+        fullURL    = archiveURL + source.id + '/' + entry.path;
     
     /*----------------------------------+
      | Fill in data at bottom of screen |
      +----------------------------------*/
     // URL text
-    document.querySelector('#url span').textContent = decodeURIComponent(list[sourceID][targetID].url);
+    document.querySelector('#url span').textContent = decodeURIComponent(entry.url);
     // Search domain
-    {
-        let host = new URL(list[sourceID][targetID].url).hostname;
-        document.querySelector('#links a:nth-of-type(1)').href = '../?query=' + (host.startsWith('www.') ? host.substring('www.'.length) : host);
-    }
+    document.querySelector('#links a:nth-of-type(1)').href = '../?query=' + new URL(entry.url).hostname.replace(/^(www\.|)/i, '');
     // View in Wayback Machine
-    document.querySelector('#links a:nth-of-type(2)').href = 'https://web.archive.org/web/0/' + list[sourceID][targetID].url;
+    document.querySelector('#links a:nth-of-type(2)').href = 'https://web.archive.org/web/0/' + entry.url;
     // View original file
-    document.querySelector('#links a:nth-of-type(3)').href = sourcePath;
+    document.querySelector('#links a:nth-of-type(3)').href = fullURL;
     // Source
-    if (query.get('source') == 'jamsa') {
-        document.querySelector('#source a').textContent = 'World Wide Web Directory';
-        document.querySelector('#source a').href = 'https://archive.org/details/www-dir-cd';
-        document.querySelector('#source span').textContent = 'June 1995';
-    }
-    else {
-        document.querySelector('#source a').textContent = 'Einblicke ins Internet';
-        document.querySelector('#source a').href = 'https://cs.rit.edu/~ats/books/cd';
-        document.querySelector('#source span').textContent = 'October 1995';
-    }
+    document.querySelector('#source a').textContent = source.title;
+    document.querySelector('#source a').href = source.url;
+    document.querySelector('#source span').textContent = source.date;
     // See earlier/newer version
-    if (list[(sourceID + 1) % 2].findIndex(file => compareURLs(file.url, query.get('url'))) != -1) {
-        let altSource = query.get('source') == 'jamsa' ? 'einblicke' : 'jamsa';
-        document.querySelector('#switch a').textContent = 'See ' + (query.get('source') == 'jamsa' ? 'newer' : 'older') + ' version';
-        document.querySelector('#switch a').href = './?source=' + altSource + '&url=' + query.get('url');
-        document.querySelector('#switch').style.display = 'initial';
+    for (let i = 0; i < json.length; i++) {
+        if (i != sourceIndex) {
+            let altEntry = json[i].entries.find(e => compareURLs(e.url, query.get('url')));
+            if (altEntry != undefined) {
+                let altLink = document.querySelector('#source a:nth-of-type(' + (i < sourceIndex ? 2 : 3) + ')');
+                altLink.href = '?source=' + json[i].id + '&url=' + altEntry.url;
+                altLink.hidden = false;
+            }
+        }
     }
-    // Jamsa screenshot
-    if (query.get('source') == 'jamsa') {
-        let imageURL = rootPath + 'jamsa/images/' + targetID + '.png';
+    // Screenshot
+    if (source.images != '') {
+        let imageURL = archiveURL + source.id + '/' + source.images + '/' + entryIndex + '.png';
         document.querySelector('#picture img').src = imageURL;
         document.querySelector('#picture a').href  = imageURL;
         document.querySelector('#picture').hidden  = false;
@@ -161,54 +163,47 @@ async function parseXBM(url) {
     /*-------------------------------+
      | Load and modify embedded page |
      +-------------------------------*/
-    fetch(sourcePath).then(r => sourcePath.endsWith('.htm') ? r.text() : r.blob()).then(async response => {
+    fetch(fullURL).then(r => ['.htm', '.html', '.txt'].some(ext => fullURL.endsWith(ext)) ? r.text() : r.blob()).then(async response => {
         // Apply page title to parent
-        if (list[sourceID][targetID].title != undefined && list[sourceID][targetID].title != '') {
-            let parsedTitle = new DOMParser().parseFromString(list[sourceID][targetID].title, 'text/html').body.textContent;
-            document.title = parsedTitle + ' | Archive95';
-        }
-        else
-            document.title = decodeURIComponent(list[sourceID][targetID].url) + ' | Archive95';
+        document.title = (entry.title != undefined && entry.title != ''
+            ? new DOMParser().parseFromString(entry.title, 'text/html').body.textContent
+            : decodeURIComponent(entry.url)
+        ) + ' | Archive95';
         
         // Handle non-HTML files
-        if (sourcePath.endsWith('.jpg') || sourcePath.endsWith('.gif') || sourcePath.endsWith('.xbm')) {
-            let imageEmbed = document.createElement('img');
+        if (!['.htm', '.html'].some(ext => fullURL.endsWith(ext))) {
+            if (['.jpg', '.gif', '.xbm'].some(ext => fullURL.endsWith(ext))) {
+                let imageEmbed = document.createElement('img');
+                
+                if (fullURL.endsWith('.xbm'))
+                    imageEmbed.src = await parseXBM(fullURL);
+                else
+                    imageEmbed.src = URL.createObjectURL(response);
+                
+                document.querySelector('#page > div').append(imageEmbed);
+            }
+            else if (fullURL.endsWith('.wav')) {
+                let audioEmbed = document.createElement('audio');
+                audioEmbed.src = URL.createObjectURL(response);
+                audioEmbed.controls = true;
+                document.querySelector('#page > div').append(audioEmbed);
+            }
+            else if (fullURL.endsWith('.txt')) {
+                document.querySelector('#page > pre').innerHTML = response;
+                document.querySelector('#page > pre').hidden = false;
+            }
+            else {
+                let fileLink = document.createElement('a');
+                fileLink.href = URL.createObjectURL(response);
+                fileLink.download = query.get('url').substring(query.get('url').lastIndexOf('/') + 1);
+                fileLink.dispatchEvent(new MouseEvent('click'));
+            }
             
-            if (sourcePath.endsWith('.xbm'))
-                imageEmbed.src = await parseXBM(sourcePath);
-            else
-                imageEmbed.src = window.URL.createObjectURL(response);
-            
-            document.querySelector('#page > div').append(imageEmbed);
-            return;
-        }
-        else if (sourcePath.endsWith('.wav')) {
-            let audioEmbed = document.createElement('audio');
-            audioEmbed.src = window.URL.createObjectURL(response);
-            audioEmbed.controls = true;
-            document.querySelector('#page > div').append(audioEmbed);
-            return;
-        }
-        else if (!sourcePath.endsWith('.htm')) {
-            let fileLink = document.createElement('a');
-            fileLink.href = window.URL.createObjectURL(response);
-            fileLink.download = query.get('url').substring(query.get('url').lastIndexOf('/') + 1);
-            fileLink.dispatchEvent(new MouseEvent('click'));
+            document.querySelector('#url > div').style.display = 'none';
             return;
         }
         
         let pageMarkup = response;
-        
-        // Handle plaintext pages
-        if (list[sourceID][targetID].plaintext) {
-            document.querySelector('#page > pre').innerHTML = pageMarkup;
-            document.querySelector('#page > div').hidden = true;
-            document.querySelector('#page > pre').hidden = false;
-            return;
-        }
-        
-        // Display loading icon
-        document.querySelector('#url > div').style.display = 'inline-block';
         
         // Fix bad markup that can hide large portions of a page in modern browsers
         {
@@ -257,23 +252,23 @@ async function parseXBM(url) {
             }
         }
         
-        /*----------------------------------------------+
-         | Revert markup changes if source is Einblicke |
-         +----------------------------------------------*/
-        if (query.get('source') == 'einblicke') {
-            pageMarkup = pageMarkup.replaceAll(
+        /*----------------------------------------------------------+
+         | Revert markup changes specific to Einblicke ins Internet |
+         +----------------------------------------------------------*/
+        if (source.id == 'einblicke') {
+            pageMarkup = pageMarkup.replace(
                 // Remove footer
                 /(\r?)(\n?)<hr>(\r?)(\n?)Original: .*? \[\[<a href=".*?">Net<\/a>\]\](\r?)(\n?)$/gi,
                 ''
-            ).replaceAll(
+            ).replace(
                 // Remove duplicate alt attribute
                 /(teufel\.gif|link\.gif)" alt="(\[defekt\]|\[image\])"/gi,
                 '$1"'
-            ).replaceAll(
+            ).replace(
                 // Remove broken page warning
                 /^<html><body>(\r?)(\n?)<img src=".*?noise\.gif">(\r?)(\n?)<strong>Vorsicht: Diese Seite k&ouml;nnte defekt sein!<\/strong>(\r?)(\n?)(\r?)(\n?)<hr>(\r?)(\n?)/gi,
                 ''
-            ).replaceAll(
+            ).replace(
                 // Replace missing form elements with neater placeholder
                 /<p>(\r?)(\n?)<strong>Hier sollte eigentlich ein Dialog stattfinden!<\/strong>(\r?)(\n?)\[\[<a href=".*?">Net<\/a>\]\](\r?)(\n?)<p>(\r?)(\n?)/gi,
                 '<p>[[Einblicke ins Internet form placeholder]]</p>'
@@ -282,7 +277,7 @@ async function parseXBM(url) {
         
         let pageDocument = new DOMParser().parseFromString(pageMarkup, 'text/html');
         
-        if (query.get('source') == 'einblicke') {
+        if (source.id == 'einblicke') {
             // Remove placeholder images
             pageDocument.querySelectorAll('img:is([src$="teufel.gif"], [src$="link.gif"], [src$="grey.gif"])').forEach(pageImage => {
                 if (pageImage.src.endsWith('link.gif') && pageImage.parentNode.nodeName == 'A')
@@ -329,11 +324,11 @@ async function parseXBM(url) {
         {
             let backgroundMap = ['bgcolor', 'rgb'],
                 textMap = [
-                ['text',  '*'],
-                ['link',  'a:link, a:link *'],
-                ['alink', 'a:active, a:active *'],
-                ['vlink', 'a:visited, a:visited *']
-            ];
+                    ['text',  '*'],
+                    ['link',  'a:link, a:link *'],
+                    ['alink', 'a:active, a:active *'],
+                    ['vlink', 'a:visited, a:visited *']
+                ];
             backgroundMap.forEach(attribute => {
                 if (pageDocument.body.hasAttribute(attribute))
                     document.querySelector('#page').style.backgroundColor = 
@@ -375,29 +370,32 @@ async function parseXBM(url) {
             if (pageImage.hasAttribute('ismap'))
                 pageImage.removeAttribute('ismap');
             
-            if (!pageImage.hasAttribute('src'))
-                continue;
+            if (!pageImage.hasAttribute('src')) continue;
             
-            let imageIndex;
+            let imagePath = '';
+            let imageURL = source.id != 'einblicke'
+                ? new URL(pageImage.getAttribute('src'), entry.url).href
+                : new URL(pageImage.getAttribute('src'), fullURL).href.substring((archiveURL + source.id + '/').length);
             
-            if (query.get('source') == 'jamsa') {
-                let queryURL = new URL(pageImage.getAttribute('src'), list[sourceID][targetID].url).href;
-                imageIndex = list[1].findIndex(img => compareURLs(img.url, queryURL));
-            }
-            else if (!pageImage.getAttribute('src').endsWith('.xbm')) {
-                let queryPathFull = new URL(pageImage.getAttribute('src'), sourcePath).href,
-                    queryPath = queryPathFull.substring((rootPath + 'einblicke/').length);
-                
-                imageIndex = list[1].findIndex(img => img.path == queryPath);
-            }
+            if (source.id == 'einblicke' && imageURL.startsWith('icons/'))
+                imagePath = source.id + '/' + imageURL;
             else {
-                pageImage.src = await parseXBM(new URL(pageImage.getAttribute('src'), sourcePath).href);
-                continue;
+                for (let i = 0; i < json.length; i++) {
+                    let imageIndex = source.id != 'einblicke'
+                        ? json[i].entries.findIndex(img => compareURLs(img.url, imageURL))
+                        : json[i].entries.findIndex(img => img.path == imageURL);
+                    
+                    if (imageIndex != -1) {
+                        imagePath = json[i].id + '/' + json[i].entries[imageIndex].path;
+                        break;
+                    }
+                }
             }
             
-            if (imageIndex != -1) {
-                pageImage.src = rootPath + 'einblicke/' + list[1][imageIndex].path;
-            }
+            if (imagePath != '')
+                pageImage.src = !imagePath.endsWith('.xbm')
+                    ? archiveURL + imagePath
+                    : await parseXBM(archiveURL + imagePath);
             else
                 sanitizeImage(pageImage);
         }
@@ -421,10 +419,10 @@ async function parseXBM(url) {
         for (let pageLink of document.querySelectorAll('#page > div a[href]')) {
             await new Promise(resolve => setTimeout(resolve));
             
-            let fullURL;
+            let linkURL;
             
             try {
-                fullURL = new URL(pageLink.getAttribute('href'), list[sourceID][targetID].url).href;
+                linkURL = new URL(pageLink.getAttribute('href'), entry.url).href;
             }
             // Catch invalid links
             catch {
@@ -434,13 +432,13 @@ async function parseXBM(url) {
             }
             
             // Ignore anchors and non-HTTP links
-            if (!fullURL.startsWith('http://') || pageLink.getAttribute('href').startsWith('#'))
+            if (!linkURL.startsWith('http://') || pageLink.getAttribute('href').startsWith('#'))
                 continue;
             
             // Update local Einblicke links
-            if (query.get('source') == 'einblicke' && pageLink.href.startsWith(window.location.origin)) {  
-                let queryPathFull = new URL(pageLink.getAttribute('href'), sourcePath).href,
-                    queryPath = queryPathFull.substring((rootPath + 'einblicke/').length),
+            if (source.id == 'einblicke' && pageLink.href.startsWith(location.origin)) {  
+                let queryPathFull = new URL(pageLink.getAttribute('href'), fullURL).href,
+                    queryPath = queryPathFull.substring((archiveURL + 'einblicke/').length),
                     queryAnchor = '';
                 
                 if (queryPath.indexOf('#') != -1) {
@@ -448,23 +446,22 @@ async function parseXBM(url) {
                     queryPath = queryPath.split('#')[0];
                 }
                 
-                let actualURL = list[1].find(file => file.path == queryPath).url;
-                pageLink.href = './?source=einblicke&url=' + (actualURL + queryAnchor);
+                let actualURL = source.entries.find(entry => entry.path == queryPath).url;
+                pageLink.href = './?source=' + source.id + '&url=' + (actualURL + queryAnchor);
                 
                 continue;
             }
             
             // Look for link in databases and update if found
-            for (let i = 0; i < list.length; i++) {
-                let j = (i + sourceID) % 2,
-                    pageIndex = list[j].findIndex(file => compareURLs(file.url, fullURL));
+            for (let i = 0; i < json.length; i++) {
+                let pageIndex = json[i].entries.findIndex(entry => compareURLs(entry.url, linkURL));
                 
                 if (pageIndex != -1)
-                    pageLink.href = './?source=' + (j == 0 ? 'jamsa' : 'einblicke') + '&url=' + list[j][pageIndex].url;
-                else if (i == list.length - 1) {
+                    pageLink.href = './?source=' + json[i].id + '&url=' + json[i].entries[pageIndex].url;
+                else if (i == json.length - 1) {
                     // Redirect to Wayback Machine if link doesn't exist locally
                     pageLink.setAttribute('target', '_blank');
-                    pageLink.href = 'https://web.archive.org/web/0/' + fullURL;
+                    pageLink.href = 'https://web.archive.org/web/0/' + linkURL;
                 }
             }
         }
@@ -472,4 +469,4 @@ async function parseXBM(url) {
         // Hide loading icon now that the page has loaded
         document.querySelector('#url > div').style.display = 'none';
     });
-})();
+});
