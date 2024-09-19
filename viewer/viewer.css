@@ -11,6 +11,12 @@ body {
     flex-grow: 1;
     padding: 8px;
 }
+#warning {
+    color: #f00;
+    text-align: center;
+    padding: 4px 0;
+    border-top: 1px solid #000;
+}
 #footer {
     display: flex;
     flex-direction: row;

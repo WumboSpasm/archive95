@@ -129,6 +129,8 @@ fetch('../data.json').then(r => r.json()).then(json => {
     /*----------------------------------+
      | Fill in data at bottom of screen |
      +----------------------------------*/
+    // Broken file warning
+    document.querySelector('#warning').hidden = !entry.broken;
     // URL text
     document.querySelector('#url span').textContent = decodeURIComponent(entry.url);
     // Search domain
@@ -435,10 +437,10 @@ fetch('../data.json').then(r => r.json()).then(json => {
             if (!linkURL.startsWith('http://') || pageLink.getAttribute('href').startsWith('#'))
                 continue;
             
-            // Update local Einblicke links
-            if (source.id == 'einblicke' && pageLink.href.startsWith(location.origin)) {  
+            // Update local links
+            if (source.localLinks && pageLink.href.startsWith(location.origin)) {  
                 let queryPathFull = new URL(pageLink.getAttribute('href'), fullURL).href,
-                    queryPath = queryPathFull.substring((archiveURL + 'einblicke/').length),
+                    queryPath = queryPathFull.substring((archiveURL + source.id + '/').length),
                     queryAnchor = '';
                 
                 if (queryPath.indexOf('#') != -1) {
@@ -455,10 +457,10 @@ fetch('../data.json').then(r => r.json()).then(json => {
             // Look for link in databases and update if found
             for (let i = 0; i < json.length; i++) {
                 let pageIndex = json[i].entries.findIndex(entry => compareURLs(entry.url, linkURL));
-                
-                if (pageIndex != -1)
+                if (pageIndex != -1) {
                     pageLink.href = './?source=' + json[i].id + '&url=' + json[i].entries[pageIndex].url;
-                else if (i == json.length - 1) {
+                    break;
+                } else if (i == json.length - 1) {
                     // Redirect to Wayback Machine if link doesn't exist locally
                     pageLink.setAttribute('target', '_blank');
                     pageLink.href = 'https://web.archive.org/web/0/' + linkURL;
