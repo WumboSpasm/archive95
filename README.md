@@ -1,7 +1,7 @@
 # Archive95
 Archive95 is a viewer for nearly 30,000 pre-Wayback Machine internet files from 1995.
 
-https://archive95.wumbo.space/
+This repository has been superceded by [archive95-server](https://github.com/WumboSpasm/archive95-server/).
 
 ## Features
 * Search engine with filters for HTML and media files
